@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>hardware_interfaces</name>
+    <version>0.0.0</version>
+    <description>Contains modules and corresponding nodes to interface hardware like barometers, cameras, etc.</description>
+
+    <maintainer email="thies.lennart.alff@tuhh.de">Thies Lennart Alff</maintainer>
+
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>rospy</depend>
+    <depend>roscpp</depend>
+    <depend>python-smbus</depend>
+
+</package>

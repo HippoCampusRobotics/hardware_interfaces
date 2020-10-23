@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+import rospy
+import hardware_interfaces.ms5837 as ms5837
+from hippocampus_common.node import Node
+from sensor_msgs.msg import FluidPressure
+
+
+class BaroNode(Node):
+    def __init__(self, name):
+        super(BaroNode, self).__init__(name=name)
+        self.sensor = ms5837.MS5837_30BA()
+        if not self.sensor.init():
+            rospy.logfatal(
+                "Could not initialize barometric pressure sensor! Exiting...")
+            exit(1)
+
+        rospy.loginfo("Barometric pressure sensor initialized successfully.")
+        self.pressure_pub = rospy.Publisher("barometric_pressure",
+                                            FluidPressure,
+                                            queue_size=1)
+
+    def run(self):
+        frequency = self.get_param("~rate", default=50)
+        rate = rospy.Rate(frequency)
+        while not rospy.is_shutdown():
+            if not self.sensor.read():
+                rospy.logwarn_throttle(
+                    5, "Failed to read barometric pressure from sensor!")
+            else:
+                msg = FluidPressure()
+                msg.header.stamp = rospy.Time.now()
+                msg.fluid_pressure = self.sensor.pressure(ms5837.UNITS_Pa)
+                self.pressure_pub.publish(msg)
+            rate.sleep()
+
+
+def main():
+    n = BaroNode()
+    n.run()
+
+
+if __name__ == "__main__":
+    main()

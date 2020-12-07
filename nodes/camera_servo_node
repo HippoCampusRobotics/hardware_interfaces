@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+import rospy
+from hippocampus_common.node import Node
+import pigpio
+from dynamic_reconfigure.server import Server
+from hardware_interfaces.cfg import ServoConfig
+
+DEFAULT_PIN = 23
+PWM_MIN = 1050
+PWM_MAX = 1950
+
+
+class CameraServoNode(Node):
+    def __init__(self, name):
+        super(CameraServoNode, self).__init__(name)
+        self.pi = pigpio.pi()
+        self.servo_pin = self.get_param("camera_servo_pin", DEFAULT_PIN)
+        rospy.on_shutdown(self.on_shutdown)
+        # GPIO.setwarnings(False)
+        self.dynamic_server = Server(ServoConfig, self.on_reconfigure)
+
+    def on_reconfigure(self, config, _):
+        self.set_servo(config.pwm)
+        return config
+
+    def set_servo(self, pwm):
+        pwm = max(PWM_MIN, min(PWM_MAX, pwm))
+        self.pi.set_servo_pulsewidth(self.servo_pin, pwm)
+
+    def on_shutdown(self):
+        self.pi.set_servo_pulsewidth(self.servo_pin, 0)
+
+
+def main():
+    node = CameraServoNode("camera_servo")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

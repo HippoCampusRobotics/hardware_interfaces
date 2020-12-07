@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import rospy
+from hippocampus_common.node import Node
+import pigpio
+from dynamic_reconfigure.server import Server
+from hardware_interfaces.cfg import LightConfig
+
+DEFAULT_PIN = 18
+PWM_MIN = 1050
+PWM_MAX = 1950
+
+
+class LightNode(Node):
+    def __init__(self, name):
+        super(LightNode, self).__init__(name)
+        self.pi = pigpio.pi()
+        self.led_pin = self.get_param("led_pin", DEFAULT_PIN)
+        rospy.on_shutdown(self.on_shutdown)
+        # GPIO.setwarnings(False)
+        self.dynamic_server = Server(LightConfig, self.on_reconfigure)
+
+    def on_reconfigure(self, config, _):
+        self.set_brightness(config.brightness)
+        return config
+
+    def calc_pwm(self, brightness):
+        brightness = max(0, min(100, brightness))
+        pwm = int(PWM_MIN + float((PWM_MAX - PWM_MIN)) * brightness / 100.0)
+        return pwm
+
+    def set_brightness(self, brightness):
+        pwm = self.calc_pwm(brightness)
+        self.pi.set_servo_pulsewidth(self.led_pin, pwm)
+
+    def on_shutdown(self):
+        self.pi.set_servo_pulsewidth(self.led_pin, 0)
+
+
+def main():
+    node = LightNode("light")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

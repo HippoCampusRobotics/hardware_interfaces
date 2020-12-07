@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import rospy
 from hippocampus_common.node import Node
-from std_msgs.msg import Float64
 import pigpio
 from dynamic_reconfigure.server import Server
 from hardware_interfaces.cfg import LightConfig
@@ -15,7 +14,7 @@ class LightNode(Node):
     def __init__(self, name):
         super(LightNode, self).__init__(name)
         self.pi = pigpio.pi()
-        self.led_pin = rospy.get_param("led_pin", DEFAULT_PIN)
+        self.led_pin = self.get_param("led_pin", DEFAULT_PIN)
         rospy.on_shutdown(self.on_shutdown)
         # GPIO.setwarnings(False)
         self.dynamic_server = Server(LightConfig, self.on_reconfigure)

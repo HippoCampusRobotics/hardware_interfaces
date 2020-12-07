@@ -2,38 +2,39 @@
 import rospy
 from hippocampus_common.node import Node
 from std_msgs.msg import Float64
-from RPIO import PWM
+import pigpio
+from dynamic_reconfigure.server import Server
+from hardware_interfaces.cfg import LightConfig
 
-LED_PIN = 18
+DEFAULT_PIN = 18
 PWM_MIN = 1050
 PWM_MAX = 1950
-PWM_FREQ = 50
 
 
 class LightNode(Node):
     def __init__(self, name):
         super(LightNode, self).__init__(name)
+        self.pi = pigpio.pi()
+        self.led_pin = rospy.get_param("led_pin", DEFAULT_PIN)
         rospy.on_shutdown(self.on_shutdown)
         # GPIO.setwarnings(False)
-        self.servo = PWM.Servo()
-        self.servo.set_servo(LED_PIN, int((PWM_MIN + PWM_MAX) / 2))
+        self.dynamic_server = Server(LightConfig, self.on_reconfigure)
 
-        self.brigthness_sub = rospy.Subscriber("led_brightness",
-                                               Float64,
-                                               self.set_brightness,
-                                               queue_size=1)
+    def on_reconfigure(self, config, _):
+        self.set_brightness(config.brightness)
+        return config
 
     def calc_pwm(self, brightness):
-        brightness = max(0, min(1, brightness))
-        pwm = int(PWM_MIN + (PWM_MAX - PWM_MIN) * brightness)
+        brightness = max(0, min(100, brightness))
+        pwm = int(PWM_MIN + float((PWM_MAX - PWM_MIN)) * brightness / 100.0)
         return pwm
 
-    def set_brightness(self, msg):
-        pwm = self.calc_pwm(msg.data)
-        self.servo.set_servo(LED_PIN, pwm)
+    def set_brightness(self, brightness):
+        pwm = self.calc_pwm(brightness)
+        self.pi.set_servo_pulsewidth(self.led_pin, pwm)
 
     def on_shutdown(self):
-        self.servo.stop_servo(LED_PIN)
+        self.pi.set_servo_pulsewidth(self.led_pin, 0)
 
 
 def main():

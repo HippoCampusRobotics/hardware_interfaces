@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.0.2)
 project(hardware_interfaces)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -6,6 +6,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   dynamic_reconfigure
+)
+
+catkin_install_python(PROGRAMS 
+  nodes/barometer_node
+  nodes/camera_servo_node
+  nodes/light_node
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 catkin_python_setup()

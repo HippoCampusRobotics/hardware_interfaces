@@ -22,10 +22,7 @@
 
 # This is a copy of https://github.com/bluerobotics/ms5837-python
 
-try:
-    import smbus
-except ImportError:
-    print 'Try sudo apt-get install python-smbus'
+import smbus
 
 from time import sleep
 
@@ -110,18 +107,18 @@ class MS5837(object):
 
         crc = (self._C[0] & 0xF000) >> 12
         if crc != self._crc4(self._C):
-            print "PROM read error, CRC failed!"
+            print("PROM read error, CRC failed!")
             return False
 
         return True
 
     def read(self, oversampling=OSR_8192):
         if self._bus is None:
-            print "No bus!"
+            print("No bus!")
             return False
 
         if oversampling < OSR_256 or oversampling > OSR_8192:
-            print "Invalid oversampling option!"
+            print("Invalid oversampling option!")
             return False
 
         # Request D1 conversion (temperature)
@@ -218,9 +215,9 @@ class MS5837(object):
                          (self._temperature - 2000)) / 8
                 if (self._temperature / 100) < -15:  # Very low temp
                     OFFi = OFFi + 7 * (self._temperature +
-                                       1500l) * (self._temperature + 1500)
+                                       1500) * (self._temperature + 1500)
                     SENSi = SENSi + 4 * (self._temperature +
-                                         1500l) * (self._temperature + 1500)
+                                         1500) * (self._temperature + 1500)
             elif (self._temperature / 100) >= 20:  # High temp
                 Ti = 2 * (dT * dT) / (137438953472)
                 OFFi = (1 * (self._temperature - 2000) *

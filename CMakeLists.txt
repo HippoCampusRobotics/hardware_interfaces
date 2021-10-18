@@ -8,6 +8,12 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 )
 
+catkin_python_setup()
+generate_dynamic_reconfigure_options(
+    config/Servo.cfg
+    config/Light.cfg
+)
+
 catkin_install_python(PROGRAMS 
   nodes/barometer_node
   nodes/camera_servo_node
@@ -15,11 +21,6 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-catkin_python_setup()
-generate_dynamic_reconfigure_options(
-    config/Servo.cfg
-    config/Light.cfg
-)
 catkin_package(
   CATKIN_DEPENDS roscpp
                  sensor_msgs

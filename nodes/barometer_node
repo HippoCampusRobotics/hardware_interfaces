@@ -3,12 +3,18 @@ import rospy
 import hardware_interfaces.ms5837 as ms5837
 from hippocampus_common.node import Node
 from sensor_msgs.msg import FluidPressure
+from hardware_interfaces.cfg import BarometerConfig
+from dynamic_reconfigure.server import Server
+import threading
 
 
 class BaroNode(Node):
     def __init__(self, name):
         super(BaroNode, self).__init__(name=name)
         self.sensor = ms5837.MS5837_30BA()
+        self.data_lock = threading.RLock()
+        self.rate = rospy.Rate(10.0)
+        self.oversampling = ms5837.OSR_256
         if not self.sensor.init():
             rospy.logfatal(
                 "Could not initialize barometric pressure sensor! Exiting...")
@@ -18,12 +24,11 @@ class BaroNode(Node):
         self.pressure_pub = rospy.Publisher("barometric_pressure",
                                             FluidPressure,
                                             queue_size=1)
+        self.dynamic_server = Server(BarometerConfig, self.on_reconfigure)
 
     def run(self):
-        frequency = self.get_param("~rate", default=50)
-        rate = rospy.Rate(frequency)
         while not rospy.is_shutdown():
-            if not self.sensor.read():
+            if not self.sensor.read(oversampling=self.oversampling):
                 rospy.logwarn_throttle(
                     5, "Failed to read barometric pressure from sensor!")
             else:
@@ -31,7 +36,13 @@ class BaroNode(Node):
                 msg.header.stamp = rospy.Time.now()
                 msg.fluid_pressure = self.sensor.pressure(ms5837.UNITS_Pa)
                 self.pressure_pub.publish(msg)
-            rate.sleep()
+            self.rate.sleep()
+
+    def on_reconfigure(self, config, _):
+        with self.data_lock:
+            self.rate = rospy.Rate(config["rate_limit"])
+            self.oversampling = config["oversampling"]
+        return config
 
 
 def main():

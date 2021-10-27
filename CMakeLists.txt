@@ -10,8 +10,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_python_setup()
 generate_dynamic_reconfigure_options(
-    config/Servo.cfg
-    config/Light.cfg
+    cfg/Servo.cfg
+    cfg/Light.cfg
+    cfg/Barometer.cfg
 )
 
 catkin_install_python(PROGRAMS 

@@ -1,9 +1,9 @@
 <launch>
     <arg name="vehicle_name" />
     <group ns="$(arg vehicle_name)">
-        <node pkg="hardware_interfaces" type="light_node" />
-        <node pkg="hardware_interfaces" type="barometer_node" />
-        <node pkg="hardware_interfaces" type="camera_servo_node" />
+        <node pkg="hardware_interfaces" type="light_node" name="light" />
+        <node pkg="hardware_interfaces" type="barometer_node" name="barometer" />
+        <node pkg="hardware_interfaces" type="camera_servo_node" name="camera_servo" />
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />

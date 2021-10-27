@@ -21,7 +21,7 @@ class BaroNode(Node):
             exit(1)
 
         rospy.loginfo("Barometric pressure sensor initialized successfully.")
-        self.pressure_pub = rospy.Publisher("barometric_pressure",
+        self.pressure_pub = rospy.Publisher("pressure",
                                             FluidPressure,
                                             queue_size=1)
         self.dynamic_server = Server(BarometerConfig, self.on_reconfigure)

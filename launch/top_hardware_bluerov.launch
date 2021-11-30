@@ -4,6 +4,7 @@
         <node pkg="hardware_interfaces" type="light_node" name="light" />
         <node pkg="hardware_interfaces" type="barometer_node" name="barometer" />
         <node pkg="hardware_interfaces" type="camera_servo_node" name="camera_servo" />
+        <include file="$(find hippocampus_common)/launch/inc_quat_to_rpy.launch" />
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />

@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="hardware_interfaces" type="barometer_node" name="barometer" output="screen"/>
+</launch>

@@ -1,5 +1,6 @@
 <launch>
     <arg name="vehicle_name" />
+    <arg name="camera_calibration_file" default="$(find mjpeg_cam)/config/front_camera.yaml" />
     <group ns="$(arg vehicle_name)">
         <node pkg="hardware_interfaces" type="light_node" name="light" />
         <node pkg="hardware_interfaces" type="barometer_node" name="barometer" />
@@ -7,5 +8,6 @@
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />
+        <arg name="calibration_file" value="$(arg camera_calibration_file)" />
     </include>
 </launch>

@@ -1,0 +1,8 @@
+#!/bin/bash
+VEHICLE_NAME="$1"
+QGC_HOST="$2"
+
+
+QGC_IP="$(ping -c 2 -a $QGC_HOST | head -1 | cut -d " " -f 3 | tr -d '()')"
+echo "Connecting with $QGC_HOST at $QGC_IP"
+exec roslaunch hardware_interfaces mavros.launch vehicle_name:=$VEHICLE_NAME fcu_url:="serial:///dev/fcu_usb:921600" gcs_url:="udp://@$QGC_IP:14550" respawn_mavros:=true

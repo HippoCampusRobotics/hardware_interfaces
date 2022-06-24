@@ -1,5 +1,6 @@
 <launch>
     <arg name="vehicle_name" />
+    <arg name="qgc_hostname" />
     <arg name="camera_calibration_file" default="$(find mjpeg_cam)/config/front_camera.yaml" />
     <group ns="$(arg vehicle_name)">
         <node pkg="hardware_interfaces" type="light_node" name="light" />
@@ -10,4 +11,5 @@
         <arg name="vehicle_name" value="$(arg vehicle_name)" />
         <arg name="calibration_file" value="$(arg camera_calibration_file)" />
     </include>
+    <node name="$(anon mavros_launcher)" pkg="hardware_interfaces" type="mavros" args="$(arg vehicle_name) $(arg qgc_hostname)" />
 </launch>

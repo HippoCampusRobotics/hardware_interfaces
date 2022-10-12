@@ -15,5 +15,6 @@
     <depend>python3-smbus</depend>
     <depend>sensor_msgs</depend>
     <depend>dynamic_reconfigure</depend>
+    <depend>fav_msgs</depend>
 
 </package>

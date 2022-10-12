@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   dynamic_reconfigure
+  fav_msgs
 )
 
 catkin_python_setup()
@@ -29,9 +30,12 @@ catkin_package(
 )
 
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIR}
 )
+
+add_executable(esc_commander src/esc_commander.cpp)
+target_link_libraries(esc_commander ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
+add_dependencies(esc_commander fav_msgs_generate_messages_cpp)
 
 

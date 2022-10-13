@@ -15,6 +15,7 @@
 #include "cobs.hpp"
 #include "packet.hpp"
 
+static constexpr double kInputScaling = 0.4;
 static constexpr uint16_t kPwmMax = 1900;
 static constexpr uint16_t kPwmMin = 1100;
 static constexpr int kNumberMotors = 8;
@@ -122,6 +123,7 @@ class EscCommanderNode {
     } else if (_input < -1.0) {
       _input = -1.0;
     }
+    _input *= kInputScaling;
     return 0.5 * (kPwmMax + kPwmMin) + _input * 0.5 * (kPwmMax - kPwmMin);
   }
 

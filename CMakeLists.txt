@@ -34,7 +34,7 @@ include_directories(
   ${Boost_INCLUDE_DIR}
 )
 
-add_executable(esc_commander src/esc_commander.cpp)
+add_executable(esc_commander src/esc_commander.cpp src/packet.cpp src/cobs.cpp)
 target_link_libraries(esc_commander ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
 add_dependencies(esc_commander fav_msgs_generate_messages_cpp)
 

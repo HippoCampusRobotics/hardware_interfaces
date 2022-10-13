@@ -3,11 +3,17 @@
 #include <fav_msgs/ThrusterSetpoint.h>
 #include <fcntl.h>
 #include <ros/ros.h>
+#include <std_msgs/Float64.h>
+#include <std_srvs/SetBool.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
-#include <boost/crc.hpp>
+#include <thread>
+
+#include "cobs.hpp"
+#include "packet.hpp"
 
 static constexpr uint16_t kPwmMax = 1900;
 static constexpr uint16_t kPwmMin = 1100;
@@ -18,53 +24,6 @@ static constexpr int kPwmPacketSize =
     1 + kPwmPayloadSize + sizeof(uint32_t) + 1;
 static constexpr int kPwmCrcOffset = 1 + kPwmPayloadSize;
 
-/**
- * @brief
- *
- * @param _buffer
- * @param _length Total length including COBS byte at the start and the
- * delimiter byte at the end.
- */
-void cobs_encode(uint8_t *_buffer, int _length) {
-  _buffer[0] = 0;
-  _buffer[_length - 1] = 0;
-  uint8_t offset = 0;
-  for (int i = 1; i < _length; ++i) {
-    ++offset;
-    if (_buffer[i] == 0) {
-      _buffer[i - offset] = offset;
-      offset = 0;
-    }
-  }
-}
-/**
- * @brief
- *
- * @param _buffer
- * @param _length Total length including COBY byte at the start and the
- * delimiter byte at the end.
- * @return uint8_t* Start of the decoded data.
- */
-uint8_t *cobs_decode(uint8_t *_buffer, int _length) {
-  if (!_buffer) {
-    return nullptr;
-  }
-  int i = 0;
-  int next_zero = _buffer[0];
-  while (true) {
-    i += next_zero;
-    if (i >= _length) {
-      return nullptr;
-    }
-    next_zero = _buffer[i];
-    // delimiter found
-    if (next_zero == 0) {
-      return &_buffer[1];
-    }
-    _buffer[i] = 0;
-  }
-}
-
 class EscCommanderNode {
  public:
   EscCommanderNode(ros::NodeHandle *_ros_node) {
@@ -73,6 +32,7 @@ class EscCommanderNode {
     if (!ros::param::get("~serial_port", port_name_)) {
       port_name_ = "/dev/teensy";
     }
+    ROS_INFO("Using port '%s'", port_name_.c_str());
   }
 
   void Run() {
@@ -80,17 +40,47 @@ class EscCommanderNode {
       ros::shutdown();
       return;
     }
+    arming_service_ = ros_node_->advertiseService(
+        "arm", &EscCommanderNode::OnServeArming, this);
     watchdog_ = ros_node_->createTimer(
         ros::Duration(0.3),
         boost::bind(&EscCommanderNode::OnWatchdogTimeout, this, _1));
     setpoint_sub_ = ros_node_->subscribe<fav_msgs::ThrusterSetpoint>(
         setpoint_topic_, 1,
         boost::bind(&EscCommanderNode::OnThrusterSetpoint, this, _1));
+    voltage_pub_ =
+        ros_node_->advertise<std_msgs::Float64>("battery_voltage", 1);
 
+    std::thread serial_thread(&EscCommanderNode::SerialThread, this);
     ros::spin();
   }
 
  private:
+  union Voltage {
+    float value;
+    uint8_t bytes[sizeof(float)];
+  };
+  bool OnServeArming(std_srvs::SetBool::Request &_request,
+                     std_srvs::SetBool::Response &_response) {
+    armed_ = _request.data;
+    _response.success = true;
+    return true;
+  }
+  void PublishVoltage() {
+    Voltage voltage;
+    if (voltage_packet_.PayloadSize() != sizeof(voltage.bytes)) {
+      ROS_WARN("Voltage Payload has wrong size. Has %d but expected %lu.",
+               voltage_packet_.PayloadSize(), sizeof(voltage.bytes));
+      return;
+    }
+    const uint8_t *data = voltage_packet_.Payload();
+    for (int i = 0; i < voltage_packet_.PayloadSize(); ++i) {
+      voltage.bytes[i] = data[i];
+    }
+    std_msgs::Float64 msg;
+    msg.data = voltage.value;
+    voltage_pub_.publish(msg);
+  }
   bool InitSerial(std::string _port_name) {
     serial_port_ = open(_port_name.c_str(), O_RDWR);
     tty_.c_cflag &= ~PARENB;  // no parity
@@ -150,41 +140,75 @@ class EscCommanderNode {
     watchdog_ = ros_node_->createTimer(
         ros::Duration(0.3),
         boost::bind(&EscCommanderNode::OnWatchdogTimeout, this, _1));
-    WriteThrustSetpoint(_msg->data);
+    if (armed_) {
+      WriteThrustSetpoint(_msg->data);
+    }
   }
 
   bool WriteThrustSetpoint(
       const boost::array<double, kNumberMotors> &_setpoint) {
-    uint8_t buffer[kPwmPacketSize];
-    uint8_t *payload = buffer + kPwmPayloadOffset;
-    uint8_t *crc = buffer + kPwmCrcOffset;
+    pwm_packet_.Reset();
+    uint8_t buffer[kNumberMotors * sizeof(uint16_t)];
+    uint8_t *write_pointer = buffer;
     for (int i = 0; i < kNumberMotors; ++i) {
       uint16_t pwm = SetpointToPwm(_setpoint[i]);
-      payload[i * sizeof(uint16_t)] = (uint8_t)(pwm >> 8);
-      payload[i * sizeof(uint16_t) + 1] = (uint8_t)(pwm & 0xFF);
+      *write_pointer++ = (uint8_t)(pwm >> 8);
+      *write_pointer++ = (uint8_t)(pwm & 0xFF);
     }
-    boost::crc_32_type result;
-    result.process_bytes(payload, kPwmPayloadSize);
-    crc[0] = (uint8_t)(result.checksum() >> 24);
-    crc[1] = (uint8_t)((result.checksum() >> 16) & 0xFF);
-    crc[2] = (uint8_t)((result.checksum() >> 8) & 0xFF);
-    crc[3] = (uint8_t)(result.checksum() & 0xFF);
-    cobs_encode(buffer, kPwmPacketSize);
-    int bytes_written = write(serial_port_, buffer, kPwmPacketSize);
+    pwm_packet_.SetPayload(buffer, sizeof(buffer));
+    pwm_packet_.Packetize();
+    int bytes_written =
+        write(serial_port_, pwm_packet_.Data(), pwm_packet_.Size());
     bool success = bytes_written == kPwmPacketSize;
     ROS_ERROR_COND(!success,
                    "Could not write all data to serial port. Written %d of %d.",
                    bytes_written, kPwmPacketSize);
     return success;
   }
+
+  void SerialThread() {
+    auto rate = ros::Rate(ros::Duration(0.1));
+    while (ros::ok()) {
+      rate.sleep();
+      int available = 0;
+      if (ioctl(serial_port_, FIONREAD, &available) < 0) {
+        continue;
+      };
+      for (int i = 0; i < available; ++i) {
+        uint8_t byte;
+        int length = read(serial_port_, &byte, 1);
+        if (length) {
+          if (!voltage_packet_.AddByte(byte)) {
+            voltage_packet_.Reset();
+            ROS_WARN("Receive buffer full before packet was complete.");
+          } else if (voltage_packet_.Complete()) {
+            if (!voltage_packet_.Decode()) {
+              ROS_WARN("Failed to decode packet.");
+            } else if (!voltage_packet_.CrcOk()) {
+              ROS_WARN("CRC failed.");
+            } else {
+              PublishVoltage();
+            }
+            voltage_packet_.Reset();
+          }
+        }
+      }
+    }
+  }
   ros::NodeHandle *ros_node_;
   ros::Subscriber setpoint_sub_;
+  ros::Publisher voltage_pub_;
   ros::Timer watchdog_;
+  ros::ServiceServer arming_service_;
+  std::atomic<bool> armed_{false};
   std::string setpoint_topic_;
   bool timed_out_{false};
   int serial_port_;
   std::string port_name_;
   struct termios tty_;
+  Voltage voltage;
+  Packet pwm_packet_;
+  Packet voltage_packet_;
 };
 
 int main(int argc, char **argv) {

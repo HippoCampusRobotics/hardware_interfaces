@@ -84,27 +84,17 @@ class EscCommanderNode {
   }
   bool InitSerial(std::string _port_name) {
     serial_port_ = open(_port_name.c_str(), O_RDWR);
-    tty_.c_cflag &= ~PARENB;  // no parity
-    tty_.c_cflag &= ~CSTOPB;  // 1 stop bit
-    tty_.c_cflag &= ~CSIZE;
-    tty_.c_cflag |= CS8;       // 8 bit mode
     tty_.c_cflag &= ~CRTSCTS;  // disable hardware flow control
     tty_.c_cflag |= CREAD | CLOCAL;
-    tty_.c_lflag &= ~ICANON;
-    tty_.c_lflag &= ~ECHO;    // Disable echo
-    tty_.c_lflag &= ~ECHOE;   // Disable erasure
-    tty_.c_lflag &= ~ECHONL;  // Disable new-line echo
-    tty_.c_lflag &= ~ISIG;    // Disable interpretation of INTR, QUIT and SUSP
     tty_.c_iflag &= ~(IXON | IXOFF | IXANY);  // Turn off s/w flow ctrl
-    tty_.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR |
-                      ICRNL);  // Disable any special handling of received bytes
-    tty_.c_oflag &= ~OPOST;    // Prevent special interpretation of output bytes
-                               // (e.g. newline chars)
     tty_.c_oflag &=
         ~ONLCR;  // Prevent conversion of newline to carriage return/line feed
-    tty_.c_cc[VTIME] = 10;  // Wait for up to 1s (10 deciseconds), returning as
-                            // soon as any data is received.
-    tty_.c_cc[VMIN] = 0;
+
+    // this combination of TIME and MIN makes a read call blocking until the
+    // lesser of MIN and the requested bytes are availabe.
+    tty_.c_cc[VTIME] = 0;
+    tty_.c_cc[VMIN] = 1;
+    cfmakeraw(&tty_);
 
     // baud rate
     cfsetispeed(&tty_, B115200);

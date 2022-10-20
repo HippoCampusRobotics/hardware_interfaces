@@ -3,6 +3,7 @@
 #include <fav_msgs/ThrusterSetpoint.h>
 #include <fcntl.h>
 #include <ros/ros.h>
+#include <std_msgs/Bool.h>
 #include <std_msgs/Float64.h>
 #include <std_srvs/SetBool.h>
 #include <stdio.h>
@@ -51,6 +52,12 @@ class EscCommanderNode {
         boost::bind(&EscCommanderNode::OnThrusterSetpoint, this, _1));
     voltage_pub_ =
         ros_node_->advertise<std_msgs::Float64>("battery_voltage", 1);
+    arming_state_pub_ =
+        ros_node_->advertise<std_msgs::Bool>("arming_state", 10);
+
+    arming_state_timer_ = ros_node_->createTimer(
+        ros::Duration(1.0),
+        boost::bind(&EscCommanderNode::OnArmingStatePublish, this, _1));
 
     std::thread serial_thread(&EscCommanderNode::SerialThread, this);
     ros::spin();
@@ -66,6 +73,11 @@ class EscCommanderNode {
     armed_ = _request.data;
     _response.success = true;
     return true;
+  }
+  void OnArmingStatePublish(const ros::TimerEvent &) {
+    std_msgs::Bool msg;
+    msg.data = armed_;
+    arming_state_pub_.publish(msg);
   }
   void PublishVoltage() {
     Voltage voltage;
@@ -190,7 +202,9 @@ class EscCommanderNode {
   ros::NodeHandle *ros_node_;
   ros::Subscriber setpoint_sub_;
   ros::Publisher voltage_pub_;
+  ros::Publisher arming_state_pub_;
   ros::Timer watchdog_;
+  ros::Timer arming_state_timer_;
   ros::ServiceServer arming_service_;
   std::atomic<bool> armed_{false};
   std::string setpoint_topic_;

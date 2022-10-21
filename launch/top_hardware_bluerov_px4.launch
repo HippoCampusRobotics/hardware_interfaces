@@ -6,10 +6,10 @@
         <node pkg="hardware_interfaces" type="light_node" name="light" />
         <node pkg="hardware_interfaces" type="barometer_node" name="barometer" />
         <node pkg="hardware_interfaces" type="camera_servo_node" name="camera_servo" />
-        <node name="$(anon esc_commander)" pkg="hardware_interfaces" type="esc_commander" output="screen" />
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />
         <arg name="calibration_file" value="$(arg camera_calibration_file)" />
     </include>
+    <node name="$(anon mavros_launcher)" pkg="hardware_interfaces" type="mavros" args="$(arg vehicle_name) $(arg qgc_hostname)" />
 </launch>

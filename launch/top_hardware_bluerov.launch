@@ -6,7 +6,10 @@
         <node pkg="hardware_interfaces" type="light_node" name="light" />
         <node pkg="hardware_interfaces" type="barometer_node" name="barometer" />
         <node pkg="hardware_interfaces" type="camera_servo_node" name="camera_servo" />
-        <node name="$(anon esc_commander)" pkg="hardware_interfaces" type="esc_commander" output="screen" />
+        <node name="esc_commander" pkg="hardware_interfaces" type="esc_commander" output="screen" />
+        <node name="mixer" pkg="fav_sim" type="simple_mixer" output="screen">
+            <rosparam command="load" file="$(find fav_sim)/config/mixer_default.yaml" />
+        </node>
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />

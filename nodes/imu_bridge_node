@@ -3,14 +3,24 @@ import rospy
 from hippocampus_common.node import Node
 from pymavlink import mavutil
 from geometry_msgs.msg import Vector3Stamped
+from sensor_msgs.msg import Imu
+import tf.transformations
+import numpy as np
 
 
 class BridgeNode(Node):
+
     def __init__(self, name, anonymous=False, disable_signals=False):
         super().__init__(name, anonymous, disable_signals)
         self.connection = mavutil.mavlink_connection('/dev/fcu_usb',
                                                      baud=921600)
         self.rpy_pub = rospy.Publisher('rpy', Vector3Stamped, queue_size=30)
+        self.imu_pub = rospy.Publisher('imu/data', Imu, queue_size=30)
+        self.msg = Imu()
+        cov = 0.02 * 3.14 / 180
+        ang_cov = np.diag([cov] * 3)
+        self.msg.angular_velocity_covariance = ang_cov.flatten().tolist()
+        self.msg.linear_acceleration_covariance = np.diag([0.0003]*3).flatten().tolist()
 
     def run(self):
         rospy.loginfo('Waiting for heartbeat...')
@@ -25,21 +35,39 @@ class BridgeNode(Node):
             now = rospy.get_time()
             if now - t_heartbeat >= 1.0:
                 self.connection.mav.heartbeat_send(
-                    mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER,
+                    mavutil.mavlink.MAV_TYPE_GCS,
                     mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
                 t_heartbeat = now
-            msg = self.connection.recv_match(type='ATTITUDE', blocking=True)
+            msg = self.connection.recv_match(type=['ATTITUDE', 'HIGHRES_IMU'],
+                                             blocking=True)
             if not msg:
                 continue
             if msg.get_type() == 'BAD_DATA':
                 rospy.logwarn('Received bad data!')
             else:
-                out = Vector3Stamped()
-                out.header.stamp = rospy.Time.now()
-                out.vector.x = msg.roll
-                out.vector.y = msg.pitch
-                out.vector.z = msg.yaw
-                self.rpy_pub.publish(out)
+                if msg.get_type() == 'ATTITUDE':
+                    self.handle_attitude(msg)
+                elif msg.get_type() == 'HIGHRES_IMU':
+                    self.handle_highres_imu(msg)
+
+    def handle_attitude(self, msg):
+        q = tf.transformations.quaternion_from_euler(msg.roll, -msg.pitch,
+                                                     -msg.yaw)
+        self.msg.orientation.x = q[0]
+        self.msg.orientation.y = q[1]
+        self.msg.orientation.z = q[2]
+        self.msg.orientation.w = q[3]
+        self.msg.header.stamp = rospy.Time.now()
+        self.msg.header.frame_id = 'map'
+        self.imu_pub.publish(self.msg)
+
+    def handle_highres_imu(self, msg):
+        self.msg.linear_acceleration.x = msg.xacc
+        self.msg.linear_acceleration.y = -msg.yacc
+        self.msg.linear_acceleration.z = -msg.zacc
+        self.msg.angular_velocity.x = msg.xgyro
+        self.msg.angular_velocity.y = -msg.ygyro
+        self.msg.angular_velocity.z = -msg.zgyro
 
 
 def main():

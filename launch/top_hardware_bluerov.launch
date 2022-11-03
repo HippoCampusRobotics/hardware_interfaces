@@ -10,6 +10,7 @@
         <node name="mixer" pkg="fav_sim" type="simple_mixer" output="screen">
             <rosparam command="load" file="$(find fav_sim)/config/mixer_default.yaml" />
         </node>
+        <node name="imu" pkg="hardware_interfaces" type="imu_bridge_node" output="screen" />
     </group>
     <include file="$(find mjpeg_cam)/launch/mjpeg_cam_run.launch">
         <arg name="vehicle_name" value="$(arg vehicle_name)" />

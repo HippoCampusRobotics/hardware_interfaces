@@ -28,14 +28,17 @@ class BaroNode(Node):
 
     def run(self):
         while not rospy.is_shutdown():
-            if not self.sensor.read(oversampling=self.oversampling):
-                rospy.logwarn_throttle(
-                    5, "Failed to read barometric pressure from sensor!")
+            success = False
+            try:
+                success = self.sensor.read(oversampling=self.oversampling)
+            except OSError as e:
+                rospy.logwarn(f'{e}')
             else:
-                msg = FluidPressure()
-                msg.header.stamp = rospy.Time.now()
-                msg.fluid_pressure = self.sensor.pressure(ms5837.UNITS_Pa)
-                self.pressure_pub.publish(msg)
+                if success:
+                    msg = FluidPressure()
+                    msg.header.stamp = rospy.Time.now()
+                    msg.fluid_pressure = self.sensor.pressure(ms5837.UNITS_Pa)
+                    self.pressure_pub.publish(msg)
             self.rate.sleep()
 
     def on_reconfigure(self, config, _):

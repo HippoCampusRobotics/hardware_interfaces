@@ -19,6 +19,7 @@ generate_dynamic_reconfigure_options(
 catkin_install_python(PROGRAMS 
   nodes/barometer_node
   nodes/camera_servo_node
+  nodes/imu_bridge_node
   nodes/light_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
